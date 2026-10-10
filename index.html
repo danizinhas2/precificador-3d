@@ -1,0 +1,1606 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{color-scheme:light}body{margin:0}</style>
+<title>Precificador 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: três abas (Calculadora, Modelos salvos, Taxas dos canais).
+     Na calculadora, formulário em seções à esquerda e painel de preço fixo à direita.
+     No celular o painel vem depois do formulário e uma barra no rodapé mostra o preço. */
+  :root {
+    --bg: #EAEFED;
+    --surface: #F6F9F8;
+    --field: #FFFFFF;
+    --ink: #13201D;
+    --muted: #53645F;
+    --line: #C7D2CD;
+    --accent: #0A7468;
+    --accent-ink: #FFFFFF;
+    --danger: #A32D2D;
+
+    --panel: #11201D;
+    --panel-ink: #E9F2EF;
+    --panel-muted: #8FA8A1;
+    --panel-line: #294039;
+    --layer: rgba(255, 255, 255, 0.035);
+    --hover: rgba(255, 255, 255, 0.06);
+    --tip-bg: #E9F2EF;
+    --tip-ink: #11201D;
+
+    /* Cores do gráfico de composição: passos escuros da paleta categórica,
+       validados contra as duas superfícies do painel (que é escuro nos dois temas). */
+    --s-custo: #3987e5;
+    --s-canal: #d95926;
+    --s-imposto: #199e70;
+    --s-lucro: #c98500;
+
+    --f-display: 'Bricolage Grotesque', 'Arial Narrow', system-ui, sans-serif;
+    --f-body: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --f-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0B1110;
+      --surface: #121A19;
+      --field: #0F1716;
+      --ink: #E6EEEB;
+      --muted: #8FA39C;
+      --line: #26332F;
+      --accent: #3FC2B2;
+      --accent-ink: #06201C;
+      --danger: #F08A8A;
+      --panel: #162420;
+      --panel-line: #2B423C;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0B1110;
+    --surface: #121A19;
+    --field: #0F1716;
+    --ink: #E6EEEB;
+    --muted: #8FA39C;
+    --line: #26332F;
+    --accent: #3FC2B2;
+    --accent-ink: #06201C;
+    --danger: #F08A8A;
+    --panel: #162420;
+    --panel-line: #2B423C;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--f-body);
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .wrap {
+    max-width: 1180px;
+    margin-inline: auto;
+    padding-inline: max(16px, 4vw);
+    padding-block: 28px 48px;
+  }
+  button { font-family: inherit; }
+  input:focus-visible, button:focus-visible, a:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* Cabeçalho */
+  .top { padding-bottom: 22px; }
+  .eyebrow {
+    margin: 0;
+    font: 500 12px/1.3 var(--f-mono);
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  h1 {
+    margin: 8px 0 8px;
+    font: 800 clamp(36px, 7vw, 60px)/0.98 var(--f-display);
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+  }
+  .sub { margin: 0; color: var(--muted); max-width: 52ch; }
+
+  /* Abas */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--line);
+    overflow-x: auto;
+  }
+  .tab {
+    flex: none;
+    margin-bottom: -1px;
+    padding: 12px 14px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: none;
+    color: var(--muted);
+    font-size: 14.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .tab:hover { color: var(--ink); }
+  .tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+  .cnt {
+    margin-left: 6px;
+    padding: 1px 7px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
+    font: 500 11px var(--f-mono);
+  }
+
+  /* Botões */
+  .btn {
+    border: 0;
+    border-radius: 6px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn:hover { filter: brightness(0.93); }
+  .ghost {
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--ink);
+    border-radius: 6px;
+    padding: 9px 14px;
+    font-size: 13.5px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .ghost:hover { background: var(--surface); }
+  .ghost.danger { color: var(--danger); border-color: var(--danger); }
+
+  /* Barra de ações da calculadora */
+  .tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px 20px;
+    margin-bottom: 8px;
+    padding: 14px 16px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+  }
+  .tstate { min-width: 0; flex: 1 1 260px; }
+  .ttitle { margin: 2px 0 0; font: 600 18px/1.2 var(--f-display); overflow-wrap: anywhere; }
+  .tsub { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+  .tbtns { display: flex; flex-wrap: wrap; gap: 8px; }
+  .msg { min-height: 22px; margin: 0 0 14px; font-size: 13.5px; color: var(--accent); font-weight: 500; }
+  .msg.err { color: var(--danger); }
+
+  /* Grade principal */
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 400px;
+    gap: 36px;
+    align-items: start;
+  }
+  .form { min-width: 0; }
+
+  .sec {
+    display: grid;
+    grid-template-columns: 190px minmax(0, 1fr);
+    gap: 10px 32px;
+    padding-block: 22px 28px;
+    border-top: 1px solid var(--line);
+  }
+  .sec h2 {
+    margin: 0 0 6px;
+    font: 600 21px/1.15 var(--f-display);
+    letter-spacing: -0.01em;
+  }
+  .note { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+  .body { min-width: 0; display: grid; gap: 14px; align-content: start; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 14px 16px;
+    min-width: 0;
+  }
+  .span2 { grid-column: 1 / -1; }
+
+  .f { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .f > label, .lab { font-size: 12.5px; font-weight: 600; }
+  .box { position: relative; min-width: 0; }
+  .box input {
+    width: 100%;
+    height: 42px;
+    padding: 0 12px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--field);
+    color: var(--ink);
+    font: 500 15px var(--f-body);
+    font-variant-numeric: tabular-nums;
+  }
+  .box input::placeholder { color: var(--muted); opacity: 0.7; font-weight: 400; }
+  .box.suf input { padding-right: 42px; }
+  .box.suf.wide input { padding-right: 62px; }
+  .box.pre input { padding-left: 38px; }
+  .u {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font: 500 12px var(--f-mono);
+    color: var(--muted);
+    pointer-events: none;
+  }
+  .suf .u { right: 12px; }
+  .pre .u { left: 12px; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  .rd { margin: 0; font: 400 12px/1.5 var(--f-mono); color: var(--muted); }
+  .rd b { font-weight: 500; color: var(--ink); }
+
+  .check { display: flex; align-items: center; gap: 10px; font-size: 14px; cursor: pointer; }
+  .check input { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; flex: none; }
+
+  /* Acessórios */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--ink);
+    border-radius: 999px;
+    padding: 6px 13px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .chip:hover { background: var(--surface); border-color: var(--accent); }
+  .xlist { display: grid; gap: 8px; }
+  .xrow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 84px 118px 40px;
+    gap: 8px;
+    align-items: center;
+  }
+  .xbtn {
+    width: 40px;
+    height: 42px;
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--muted);
+    border-radius: 6px;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .xbtn:hover { color: var(--ink); border-color: var(--ink); }
+  .empty { margin: 0; font-size: 13px; color: var(--muted); }
+
+  /* Painel de preço */
+  .result {
+    position: sticky;
+    top: calc(env(safe-area-inset-top, 0px) + 16px);
+    background-color: var(--panel);
+    background-image: repeating-linear-gradient(0deg, var(--layer) 0 1px, transparent 1px 7px);
+    color: var(--panel-ink);
+    border: 1px solid var(--panel-line);
+    border-radius: 10px;
+    padding: 22px;
+    min-width: 0;
+  }
+  .result .eyebrow { color: var(--panel-muted); }
+  .result :focus-visible { outline-color: var(--panel-ink); }
+  .piece { margin: 10px 0 0; font: 600 15px/1.3 var(--f-body); overflow-wrap: anywhere; }
+  .price {
+    margin: 2px 0 4px;
+    font: 700 clamp(46px, 9vw, 60px)/1.04 var(--f-body);
+    letter-spacing: -0.02em;
+    overflow-wrap: anywhere;
+  }
+  .lead { margin: 0; font-size: 13.5px; color: var(--panel-muted); }
+  .lead b { color: var(--panel-ink); font-weight: 600; }
+  .aviso { margin: 10px 0 0; font-size: 13px; color: var(--panel-ink); padding: 8px 10px; border: 1px solid var(--panel-line); border-radius: 6px; }
+
+  .chs { display: grid; gap: 6px; margin-block: 18px; }
+  .chrow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 1px 12px;
+    align-items: center;
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--panel-line);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--panel-ink);
+    text-align: left;
+    cursor: pointer;
+  }
+  .chrow:hover { background: var(--hover); }
+  .chrow[aria-pressed="true"] { border-color: var(--panel-ink); background: var(--hover); }
+  .chrow .n { font-size: 14px; font-weight: 600; }
+  .chrow .m { grid-column: 1; font: 400 11.5px var(--f-mono); color: var(--panel-muted); }
+  .chrow .pr { grid-column: 2; grid-row: 1 / span 2; font: 700 18px var(--f-body); }
+
+  .barwrap { position: relative; margin-block: 4px 12px; }
+  .bar { display: flex; gap: 2px; height: 20px; }
+  .bar i { position: relative; display: block; min-width: 3px; cursor: default; }
+  .bar i:first-child { border-radius: 4px 0 0 4px; }
+  .bar i:last-child { border-radius: 0 4px 4px 0; }
+  .bar i:only-child { border-radius: 4px; }
+  .bar i::after { content: ''; position: absolute; inset: -6px 0; }
+  .bar i:hover, .bar i:focus-visible { filter: brightness(1.18); }
+  @media (prefers-reduced-motion: no-preference) {
+    .bar i { transition: flex-grow 0.25s ease; }
+  }
+
+  .rows { list-style: none; margin: 0; padding: 0; }
+  .row {
+    display: grid;
+    grid-template-columns: 10px minmax(0, 1fr) auto 40px;
+    gap: 10px;
+    align-items: center;
+    padding-block: 7px;
+    border-top: 1px solid var(--panel-line);
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+  }
+  .row .sw { width: 10px; height: 10px; border-radius: 2px; }
+  .row .sw.s-custo { background: var(--s-custo); }
+  .row .sw.s-canal { background: var(--s-canal); }
+  .row .sw.s-imposto { background: var(--s-imposto); }
+  .row .sw.s-lucro { background: var(--s-lucro); }
+  .row .v { text-align: right; }
+  .row .p { text-align: right; font: 400 12px var(--f-mono); color: var(--panel-muted); }
+  .row.sub { padding-block: 4px; border-top: 0; font-size: 13px; color: var(--panel-muted); }
+  .row.sub span:nth-child(2) { padding-left: 4px; }
+  .row.g { font-weight: 600; }
+  .row.zero { color: var(--panel-muted); }
+  .row.sum { font-weight: 700; }
+  .actions { display: flex; gap: 10px; margin-top: 16px; }
+  .pbtn {
+    flex: 1;
+    border: 0;
+    border-radius: 6px;
+    background: var(--panel-ink);
+    color: var(--panel);
+    padding: 11px 14px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .pbtn:hover { filter: brightness(0.92); }
+  .sumbox {
+    width: 100%;
+    margin-top: 12px;
+    padding: 10px;
+    border: 1px solid var(--panel-line);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--panel-ink);
+    font: 400 12px/1.5 var(--f-mono);
+    resize: vertical;
+  }
+  .tip {
+    position: absolute;
+    z-index: 3;
+    transform: translate(-50%, -100%);
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 7px 10px;
+    border-radius: 6px;
+    background: var(--tip-bg);
+    color: var(--tip-ink);
+    font-size: 12.5px;
+    line-height: 1.3;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .tip strong { font-size: 14px; }
+
+  /* Modelos salvos */
+  .mhead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px 20px;
+    margin-bottom: 18px;
+  }
+  .mhead h2 { margin: 0 0 4px; font: 600 24px/1.15 var(--f-display); }
+  .mhead .f { width: min(100%, 300px); }
+  .mgrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+    gap: 16px;
+  }
+  .mcard {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+    padding: 16px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+  }
+  .mcard h3 { margin: 0; font: 600 18px/1.2 var(--f-display); overflow-wrap: anywhere; }
+  .mmeta { margin: 4px 0 0; font: 400 12px/1.4 var(--f-mono); color: var(--muted); }
+  .mprices { display: grid; margin: 0; padding: 0; list-style: none; }
+  .mprices li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding-block: 4px;
+    border-top: 1px solid var(--line);
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+  }
+  .mprices li span:first-child { color: var(--muted); }
+  .mprices li b { font-weight: 600; }
+  .mactions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; }
+  .mempty {
+    margin: 0;
+    padding: 28px 20px;
+    border: 1px dashed var(--line);
+    border-radius: 8px;
+    color: var(--muted);
+    text-align: center;
+  }
+  .snote { margin: 0 0 16px; font-size: 13px; color: var(--muted); }
+
+  /* Taxas dos canais */
+  .trow {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+  }
+  .thead { font: 500 11.5px var(--f-mono); letter-spacing: 0.04em; color: var(--muted); text-transform: uppercase; }
+  .tlast { font-size: 13px; color: var(--muted); }
+  .src { margin: 0; padding-left: 18px; font-size: 13px; color: var(--muted); display: grid; gap: 4px; }
+  .src a { color: var(--accent); }
+  .intro { margin: 0 0 18px; max-width: 70ch; color: var(--muted); font-size: 14px; }
+  .irow { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-bottom: 8px; }
+
+  .dock { display: none; }
+
+  @media (max-width: 899px) {
+    .layout { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+    .result { position: static; }
+    .sec { grid-template-columns: minmax(0, 1fr); }
+    .wrap { padding-bottom: 110px; }
+    .dock {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 5;
+      padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+      background: var(--panel);
+      color: var(--panel-ink);
+      border-top: 1px solid var(--panel-line);
+    }
+    .dock > div { min-width: 0; }
+    .dock .eyebrow { color: var(--panel-muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dock .dp { font: 700 28px/1.1 var(--f-body); letter-spacing: -0.02em; }
+    .dock button {
+      flex: none;
+      border: 1px solid var(--panel-line);
+      background: transparent;
+      color: var(--panel-ink);
+      border-radius: 6px;
+      padding: 9px 14px;
+      font-size: 13.5px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+  }
+  @media (max-width: 560px) {
+    .xrow { grid-template-columns: 84px minmax(0, 1fr) 40px; }
+    .xrow .xname { grid-column: 1 / -1; }
+    .result { padding: 18px; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <p class="eyebrow">Custo e preço de venda · impressão 3D</p>
+    <h1>Precificador 3D</h1>
+    <p class="sub">Calcule o custo de cada peça, guarde os modelos e veja quanto cobrar na venda direta, no Mercado Livre, na Shopee e na Amazon.</p>
+  </header>
+
+  <div class="tabs" role="tablist" aria-label="Seções do precificador">
+    <button type="button" class="tab" role="tab" id="t-calc" data-tab="calc" aria-selected="true" aria-controls="tab-calc">Calculadora</button>
+    <button type="button" class="tab" role="tab" id="t-modelos" data-tab="modelos" aria-selected="false" aria-controls="tab-modelos">Modelos salvos<span class="cnt" id="cnt">0</span></button>
+    <button type="button" class="tab" role="tab" id="t-taxas" data-tab="taxas" aria-selected="false" aria-controls="tab-taxas">Taxas dos canais</button>
+  </div>
+
+  <!-- Aba: Calculadora -->
+  <section id="tab-calc" role="tabpanel" aria-labelledby="t-calc">
+    <div class="tools">
+      <div class="tstate">
+        <p class="eyebrow" id="t-eyebrow">Modelo</p>
+        <p class="ttitle" id="t-title">Novo cálculo</p>
+        <p class="tsub" id="t-sub"></p>
+      </div>
+      <div class="tbtns">
+        <button type="button" class="btn" id="btn-save">Salvar modelo</button>
+        <button type="button" class="ghost" id="btn-savenew" hidden>Salvar como novo</button>
+        <button type="button" class="ghost" id="btn-new" title="Limpa os dados da peça e mantém os valores de filamento, máquina e preço">Novo cálculo</button>
+      </div>
+    </div>
+    <p class="msg" id="msg" role="status" aria-live="polite"></p>
+
+    <div class="layout">
+      <div class="form">
+
+        <section class="sec">
+          <div>
+            <h2>Peça</h2>
+            <p class="note">Use o peso e o tempo que o fatiador mostra para a mesa inteira. O nome vira o nome do modelo salvo.</p>
+          </div>
+          <div class="body">
+            <div class="grid">
+              <div class="f span2">
+                <label for="peca">Nome do modelo</label>
+                <div class="box"><input type="text" id="peca" class="fi" value="Chaveiro com argola" placeholder="Ex.: chaveiro Homem-Aranha" autocomplete="off"></div>
+              </div>
+              <div class="f">
+                <label for="peso">Peso da impressão</label>
+                <div class="box suf"><input type="text" id="peso" class="fi" inputmode="decimal" value="12" placeholder="0"><span class="u">g</span></div>
+              </div>
+              <div class="f">
+                <span class="lab">Tempo de impressão</span>
+                <div class="pair">
+                  <div class="box suf"><input type="text" id="hh" class="fi" inputmode="numeric" value="1" placeholder="0" aria-label="Horas de impressão"><span class="u">h</span></div>
+                  <div class="box suf wide"><input type="text" id="mm" class="fi" inputmode="numeric" value="20" placeholder="0" aria-label="Minutos de impressão"><span class="u">min</span></div>
+                </div>
+              </div>
+              <div class="f">
+                <label for="pecasImp">Peças por impressão</label>
+                <div class="box suf"><input type="text" id="pecasImp" class="fi" inputmode="numeric" value="1"><span class="u">un</span></div>
+              </div>
+              <div class="f">
+                <label for="qtd">Quantidade do pedido</label>
+                <div class="box suf"><input type="text" id="qtd" class="fi" inputmode="numeric" value="10"><span class="u">un</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="sec">
+          <div>
+            <h2>Filamento</h2>
+            <p class="note">A perda cobre suporte, purga de cor e brim. As falhas reservam parte do custo para peças que dão errado.</p>
+          </div>
+          <div class="body">
+            <div class="grid">
+              <div class="f">
+                <label for="rolo">Preço do rolo</label>
+                <div class="box pre"><span class="u">R$</span><input type="text" id="rolo" class="fi" inputmode="decimal" value="110"></div>
+              </div>
+              <div class="f">
+                <label for="rologramas">Peso do rolo</label>
+                <div class="box suf"><input type="text" id="rologramas" class="fi" inputmode="decimal" value="1000"><span class="u">g</span></div>
+              </div>
+              <div class="f">
+                <label for="perda">Perda de material</label>
+                <div class="box suf"><input type="text" id="perda" class="fi" inputmode="decimal" value="8"><span class="u">%</span></div>
+              </div>
+              <div class="f">
+                <label for="falha">Falhas de impressão</label>
+                <div class="box suf"><input type="text" id="falha" class="fi" inputmode="decimal" value="5"><span class="u">%</span></div>
+              </div>
+            </div>
+            <p class="rd" id="rd-mat"></p>
+          </div>
+        </section>
+
+        <section class="sec">
+          <div>
+            <h2>Máquina e energia</h2>
+            <p class="note">O desgaste por hora é o preço da impressora dividido pela vida útil estimada.</p>
+          </div>
+          <div class="body">
+            <div class="grid">
+              <div class="f">
+                <label for="imp">Preço da impressora</label>
+                <div class="box pre"><span class="u">R$</span><input type="text" id="imp" class="fi" inputmode="decimal" value="2500"></div>
+              </div>
+              <div class="f">
+                <label for="vida">Vida útil estimada</label>
+                <div class="box suf"><input type="text" id="vida" class="fi" inputmode="decimal" value="5000"><span class="u">h</span></div>
+              </div>
+              <div class="f">
+                <label for="manut">Manutenção (bico, mesa, correias)</label>
+                <div class="box suf wide"><input type="text" id="manut" class="fi" inputmode="decimal" value="0,10"><span class="u">R$/h</span></div>
+              </div>
+              <div class="f">
+                <label for="watts">Consumo médio</label>
+                <div class="box suf"><input type="text" id="watts" class="fi" inputmode="decimal" value="150"><span class="u">W</span></div>
+              </div>
+              <div class="f">
+                <label for="kwh">Tarifa de energia</label>
+                <div class="box suf wide"><input type="text" id="kwh" class="fi" inputmode="decimal" value="0,95"><span class="u">R$/kWh</span></div>
+              </div>
+            </div>
+            <p class="rd" id="rd-maq"></p>
+            <p class="rd" id="rd-en"></p>
+          </div>
+        </section>
+
+        <section class="sec">
+          <div>
+            <h2>Acessórios</h2>
+            <p class="note">Itens que entram em cada unidade, como a argola do chaveiro.</p>
+          </div>
+          <div class="body">
+            <div class="chips" id="chips">
+              <button type="button" class="chip" data-n="Argola de chaveiro" data-p="0,30">+ Argola de chaveiro</button>
+              <button type="button" class="chip" data-n="Ímã de geladeira" data-p="0,60">+ Ímã</button>
+              <button type="button" class="chip" data-n="Cordão ou corrente" data-p="0,50">+ Cordão ou corrente</button>
+              <button type="button" class="chip" data-n="Embalagem" data-p="1,00">+ Embalagem</button>
+              <button type="button" class="chip" data-n="" data-p="0">+ Outro item</button>
+            </div>
+            <div class="xlist" id="extras"></div>
+            <p class="rd" id="rd-ex"></p>
+          </div>
+        </section>
+
+        <section class="sec">
+          <div>
+            <h2>Mão de obra</h2>
+            <p class="note">Acabamento, retirada de suportes e embalagem de cada peça.</p>
+          </div>
+          <div class="body">
+            <div class="grid">
+              <div class="f">
+                <label for="mo">Valor da sua hora</label>
+                <div class="box suf wide"><input type="text" id="mo" class="fi" inputmode="decimal" value="20"><span class="u">R$/h</span></div>
+              </div>
+              <div class="f">
+                <label for="acab">Tempo por unidade</label>
+                <div class="box suf wide"><input type="text" id="acab" class="fi" inputmode="decimal" value="3"><span class="u">min</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="sec">
+          <div>
+            <h2>Margem, imposto e aplicativos</h2>
+            <p class="note">A margem e os aplicativos incidem sobre o custo. O imposto incide sobre o valor da venda. As taxas de cada canal ficam na aba Taxas dos canais.</p>
+          </div>
+          <div class="body">
+            <div class="grid">
+              <div class="f">
+                <label for="margem">Margem de lucro</label>
+                <div class="box suf"><input type="text" id="margem" class="fi" inputmode="decimal" value="100"><span class="u">%</span></div>
+              </div>
+              <div class="f">
+                <label for="imposto">Imposto sobre a venda</label>
+                <div class="box suf"><input type="text" id="imposto" class="fi" inputmode="decimal" value="0"><span class="u">%</span></div>
+              </div>
+              <div class="f">
+                <label for="apps">Aplicativos e software</label>
+                <div class="box suf"><input type="text" id="apps" class="fi" inputmode="decimal" value="5"><span class="u">%</span></div>
+              </div>
+            </div>
+            <p class="rd">Aplicativos: rateio das assinaturas e programas usados para criar os modelos, como modelagem 3D, fatiador e edição de imagem. Incide sobre o custo de produção.</p>
+            <p class="rd">Imposto: use a alíquota do seu regime, como o Simples Nacional. Deixe em 0 se não quiser embutir.</p>
+            <label class="check"><input type="checkbox" id="arred" class="fi" checked> Arredondar o preço para terminar em ,90</label>
+          </div>
+        </section>
+      </div>
+
+      <aside class="result" id="result">
+        <p class="eyebrow">Preço de venda por unidade</p>
+        <p class="piece" id="out-peca"></p>
+        <div class="price" id="out-preco">R$ 0,00</div>
+        <p class="lead" id="out-canal"></p>
+        <p class="lead" id="out-lucro"></p>
+        <p class="aviso" id="out-aviso" hidden></p>
+        <div class="chs" id="chs" role="group" aria-label="Canal de venda"></div>
+        <div class="barwrap">
+          <div class="bar" id="out-bar" role="group" aria-label="Para onde vai o preço de venda"></div>
+          <div class="tip" id="tip" hidden></div>
+        </div>
+        <ul class="rows" id="out-rows"></ul>
+        <div class="actions"><button type="button" class="pbtn" id="copy">Copiar resumo</button></div>
+        <textarea class="sumbox" id="sumbox" rows="12" readonly hidden aria-label="Resumo para copiar"></textarea>
+      </aside>
+    </div>
+  </section>
+
+  <!-- Aba: Modelos salvos -->
+  <section id="tab-modelos" role="tabpanel" aria-labelledby="t-modelos" hidden>
+    <div class="mhead">
+      <div>
+        <h2>Modelos salvos</h2>
+        <p class="snote" id="store-note" style="margin:0"></p>
+      </div>
+      <div class="f">
+        <label for="busca">Buscar modelo</label>
+        <div class="box"><input type="text" id="busca" placeholder="Ex.: chaveiro" autocomplete="off"></div>
+      </div>
+    </div>
+    <div id="mlist"></div>
+  </section>
+
+  <!-- Aba: Taxas dos canais -->
+  <section id="tab-taxas" role="tabpanel" aria-labelledby="t-taxas" hidden>
+    <p class="intro">Valores pesquisados em outubro de 2026 em páginas das plataformas e em guias para vendedores. As taxas mudam com frequência e variam por categoria, então confira no painel de cada plataforma e ajuste aqui. Tudo o que você alterar fica salvo e entra no cálculo na hora.</p>
+    <div class="irow"><button type="button" class="ghost" id="restaurar-todos">Restaurar todos os valores pesquisados</button></div>
+    <div id="taxas-list"></div>
+    <section class="sec">
+      <div>
+        <h2>Fontes</h2>
+        <p class="note">Páginas consultadas para os valores iniciais.</p>
+      </div>
+      <div class="body">
+        <ul class="src">
+          <li><a href="https://venda.amazon.com.br/precos" target="_blank" rel="noopener">Amazon Brasil: preços e taxas para vendedores</a></li>
+          <li><a href="https://www.ruacep.com.br/guias/ecommerce/comissao-marketplace-ml-amazon-shopee-magalu-2026/" target="_blank" rel="noopener">Rua CEP: comissão de marketplace em 2026</a></li>
+          <li><a href="https://ecommercenapratica.com/blog/taxa-shopee/" target="_blank" rel="noopener">E-commerce na Prática: taxas da Shopee</a></li>
+          <li><a href="https://ecommercenapratica.com/blog/comissao-mercado-livre/" target="_blank" rel="noopener">E-commerce na Prática: comissão do Mercado Livre</a></li>
+          <li><a href="https://jaguarsheet.com/pt/blog/costo-fijo-mercado-livre" target="_blank" rel="noopener">JaguarSheet: custo fixo do Mercado Livre</a></li>
+          <li><a href="https://blog.bling.com.br/?p=13553" target="_blank" rel="noopener">Bling: taxas do Mercado Livre</a></li>
+        </ul>
+      </div>
+    </section>
+  </section>
+</div>
+
+<div class="dock" id="dock">
+  <div>
+    <p class="eyebrow" id="dock-nome">Preço por unidade</p>
+    <div class="dp" id="dock-preco">R$ 0,00</div>
+  </div>
+  <button type="button" id="dock-go">Ver detalhes</button>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+
+  // CALC-START
+  var CANAIS_PADRAO = [
+    { id: 'direta', nome: 'Venda direta',
+      nota: 'Venda sem marketplace. Se você paga taxa de Pix ou de cartão, coloque a porcentagem na faixa abaixo.',
+      tiers: [{ ate: '0', pct: '0', fixa: '0' }], minCom: '0', frete: '0' },
+    { id: 'mlc', nome: 'Mercado Livre Clássico',
+      nota: 'A comissão do anúncio Clássico fica entre 10% e 14%, conforme a categoria. Usei 12%. Produtos abaixo de R$ 79 têm custo fixo por unidade: guias de agosto de 2026 citam de R$ 5,50 a R$ 6,75, e usei R$ 6,75. Desde março de 2026, no Full, esse custo pode variar com peso e tamanho. Confira no Simulador de Custos do Mercado Livre.',
+      tiers: [{ ate: '79', pct: '12', fixa: '6,75' }, { ate: '0', pct: '12', fixa: '0' }], minCom: '0', frete: '0' },
+    { id: 'mlp', nome: 'Mercado Livre Premium',
+      nota: 'A comissão do anúncio Premium fica entre 15% e 19%, conforme a categoria. Usei 17%. O custo fixo abaixo de R$ 79 segue a mesma regra do Clássico.',
+      tiers: [{ ate: '79', pct: '17', fixa: '6,75' }, { ate: '0', pct: '17', fixa: '0' }], minCom: '0', frete: '0' },
+    { id: 'shopee', nome: 'Shopee',
+      nota: 'Tabela de março de 2026 para vendedor CNPJ. A comissão já inclui a taxa de transação e o frete grátis. Vendedor pessoa física paga R$ 3,00 a mais por item. Campanhas de destaque somam 2,5% e não estão incluídas.',
+      tiers: [{ ate: '80', pct: '20', fixa: '4' }, { ate: '100', pct: '14', fixa: '16' }, { ate: '200', pct: '14', fixa: '20' }, { ate: '0', pct: '14', fixa: '26' }],
+      minCom: '0', frete: '0', extraCpf: '3', cpf: false },
+    { id: 'amazon', nome: 'Amazon',
+      nota: 'Comissão de 12% para Brinquedos, Casa, Cozinha e Esportes. Outras categorias vão de 14% a 15%. O plano Individual cobra R$ 2,00 por item vendido. No plano Profissional (R$ 19 por mês depois do primeiro ano) zere a tarifa fixa. A Amazon cita comissão mínima de R$ 1,00 em um trecho e de R$ 2,00 em outro, e usei R$ 2,00.',
+      tiers: [{ ate: '0', pct: '12', fixa: '2' }], minCom: '2', frete: '0' }
+  ];
+
+  function num(v) {
+    var s = String(v == null ? '' : v).trim().replace(/\s/g, '').replace('R$', '');
+    if (!s) return 0;
+    if (s.indexOf(',') !== -1) s = s.replace(/\./g, '').replace(',', '.');
+    var n = parseFloat(s);
+    return isFinite(n) && n > 0 ? n : 0;
+  }
+
+  function toS(f, x) {
+    var g = function (k) { return num(f[k]); };
+    return {
+      peso: g('peso'), hh: g('hh'), mm: g('mm'), pecasImp: g('pecasImp'),
+      rolo: g('rolo'), rologramas: g('rologramas'), perda: g('perda'), falha: g('falha'),
+      imp: g('imp'), vida: g('vida'), manut: g('manut'), watts: g('watts'), kwh: g('kwh'),
+      mo: g('mo'), acab: g('acab'), margem: g('margem'), imposto: g('imposto'), apps: g('apps'),
+      arred: !!f.arred,
+      extras: (x || []).map(function (e) { return { q: num(e.q), p: num(e.p) }; })
+    };
+  }
+
+  function ordenar(tiers) {
+    return tiers.map(function (t) { return { ate: num(t.ate), pct: num(t.pct), fixa: num(t.fixa) }; })
+      .sort(function (a, b) {
+        var A = a.ate > 0 ? a.ate : Infinity, B = b.ate > 0 ? b.ate : Infinity;
+        return A - B;
+      });
+  }
+
+  // Acha o menor preço que cobre o custo, o lucro desejado, o imposto e as taxas do canal.
+  // A faixa de preço do canal muda a comissão e a tarifa fixa, então testa faixa por faixa.
+  function precoCanal(base, imp, ch, arred) {
+    var tiers = ordenar(ch.tiers);
+    var extra = ch.cpf ? num(ch.extraCpf) : 0;
+    var minCom = num(ch.minCom);
+    var prev = 0, price = 0, found = false;
+    for (var i = 0; i < tiers.length && !found; i++) {
+      var t = tiers[i];
+      var ate = t.ate > 0 ? t.ate : Infinity;
+      var pct = t.pct / 100, fixa = t.fixa + extra;
+      var P = (base + fixa) / (1 - Math.min(imp + pct, 0.95));
+      if (minCom > 0 && P * pct < minCom) P = (base + fixa + minCom) / (1 - Math.min(imp, 0.95));
+      if (P < ate || i === tiers.length - 1) { price = Math.max(P, prev); found = true; }
+      prev = ate;
+    }
+    if (arred && price > 0) price = Math.ceil(price + 0.10 - 1e-9) - 0.10;
+    var tr = tiers[tiers.length - 1];
+    for (var j = 0; j < tiers.length; j++) {
+      var a = tiers[j].ate > 0 ? tiers[j].ate : Infinity;
+      if (price < a) { tr = tiers[j]; break; }
+    }
+    var com = Math.max(price * tr.pct / 100, minCom > 0 ? minCom : 0);
+    return { price: price, com: com, fixa: tr.fixa + extra, pct: tr.pct };
+  }
+
+  function calc(s, canais) {
+    var units = Math.max(1, Math.floor(s.pecasImp) || 1);
+    var horas = s.hh + s.mm / 60;
+    var gramaPreco = s.rologramas > 0 ? s.rolo / s.rologramas : 0;
+    var gramasComPerda = s.peso * (1 + s.perda / 100);
+    var mat = gramasComPerda * gramaPreco / units;
+    var energiaHora = s.watts / 1000 * s.kwh;
+    var energia = energiaHora * horas / units;
+    var depHora = s.vida > 0 ? s.imp / s.vida : 0;
+    var maqHora = depHora + s.manut;
+    var desgaste = maqHora * horas / units;
+    var falhas = (mat + energia + desgaste) * s.falha / 100;
+    var acess = s.extras.reduce(function (a, e) { return a + e.q * e.p; }, 0);
+    var mo = s.acab / 60 * s.mo;
+    var prod = mat + energia + desgaste + falhas + acess + mo;
+    var app = prod * s.apps / 100;
+    var custo = prod + app;
+    var baseLucro = custo * (1 + s.margem / 100);
+    var imp = Math.min(s.imposto, 95) / 100;
+    var res = {};
+    canais.forEach(function (ch) {
+      var frete = num(ch.frete);
+      var p = precoCanal(baseLucro + frete, imp, ch, s.arred);
+      var imposto = p.price * imp;
+      var taxas = p.com + p.fixa + frete;
+      var lucro = p.price - custo - imposto - taxas;
+      res[ch.id] = {
+        price: p.price, com: p.com, fixa: p.fixa, pct: p.pct, frete: frete,
+        imposto: imposto, taxas: taxas, lucro: lucro,
+        margemReal: custo > 0 ? lucro / custo * 100 : 0
+      };
+    });
+    return {
+      units: units, horas: horas, gramaPreco: gramaPreco, gramasComPerda: gramasComPerda,
+      energiaHora: energiaHora, depHora: depHora, maqHora: maqHora,
+      mat: mat, energia: energia, desgaste: desgaste, falhas: falhas, acess: acess, mo: mo,
+      prod: prod, app: app, custo: custo, res: res
+    };
+  }
+  // CALC-END
+
+  function clonar(o) { return JSON.parse(JSON.stringify(o)); }
+
+  var brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+  var brl3 = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 3, maximumFractionDigits: 3 });
+  var dec = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 });
+  var pct0 = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
+  var pct1 = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 });
+
+  var K_RASC = 'precificador3d:rascunho:v2';
+  var K_CANAIS = 'precificador3d:canais:v1';
+  var K_MODELOS = 'precificador3d:modelos:v1';
+
+  function lsGet(k) { try { var r = localStorage.getItem(k); return r ? JSON.parse(r) : null; } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* sem armazenamento: segue funcionando */ } }
+
+  var fields = Array.prototype.slice.call(document.querySelectorAll('.fi'));
+  var DEFAULTS = {};
+  fields.forEach(function (el) { DEFAULTS[el.id] = el.type === 'checkbox' ? el.checked : el.value; });
+  var DEFAULT_EXTRAS = [{ n: 'Argola de chaveiro', q: '1', p: '0,30' }];
+
+  var extras = clonar(DEFAULT_EXTRAS);
+  var canais = clonar(CANAIS_PADRAO);
+  var sel = 'direta';
+  var editing = null;      // { id, nome, criado } quando um modelo salvo está aberto
+  var modelos = [];
+  var db = null;
+  var lastSummary = '';
+
+  function formValues() {
+    var f = {};
+    fields.forEach(function (el) { f[el.id] = el.type === 'checkbox' ? el.checked : el.value; });
+    return f;
+  }
+  function setForm(f) {
+    fields.forEach(function (el) {
+      if (!(el.id in f)) return;
+      if (el.type === 'checkbox') el.checked = !!f[el.id];
+      else el.value = String(f[el.id]);
+    });
+  }
+  function copiaExtras(x) {
+    return (x || []).map(function (e) { return { n: String(e.n || ''), q: String(e.q || '1'), p: String(e.p || '0') }; });
+  }
+
+  // ---------- Abas ----------
+  function mostrarAba(id) {
+    ['calc', 'modelos', 'taxas'].forEach(function (t) {
+      var on = t === id;
+      $('tab-' + t).hidden = !on;
+      $('t-' + t).setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    $('dock').hidden = id !== 'calc';
+    if (id === 'modelos') renderModelos();
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (b) {
+    b.addEventListener('click', function () { mostrarAba(b.getAttribute('data-tab')); });
+  });
+
+  // ---------- Mensagens e barra de ações ----------
+  var msgTimer = null;
+  function aviso(txt, erro) {
+    var m = $('msg');
+    m.textContent = txt;
+    m.className = 'msg' + (erro ? ' err' : '');
+    clearTimeout(msgTimer);
+    msgTimer = setTimeout(function () { m.textContent = ''; }, 5000);
+  }
+  function renderToolbar() {
+    $('t-eyebrow').textContent = editing ? 'Editando modelo salvo' : 'Novo cálculo';
+    $('t-title').textContent = editing ? editing.nome : 'Ainda sem salvar';
+    $('t-sub').textContent = editing
+      ? 'As mudanças só ficam guardadas quando você tocar em Atualizar modelo.'
+      : 'Preencha os valores e toque em Salvar modelo para reutilizar depois.';
+    $('btn-save').textContent = editing ? 'Atualizar modelo' : 'Salvar modelo';
+    $('btn-savenew').hidden = !editing;
+  }
+
+  // ---------- Acessórios ----------
+  function mkBox(pre, suf, attrs) {
+    var w = document.createElement('div');
+    w.className = 'box' + (pre ? ' pre' : '') + (suf ? ' suf' : '');
+    var inp = document.createElement('input');
+    inp.type = 'text';
+    Object.keys(attrs).forEach(function (k) { inp.setAttribute(k, attrs[k]); });
+    w.appendChild(inp);
+    if (pre || suf) {
+      var u = document.createElement('span');
+      u.className = 'u';
+      u.textContent = pre || suf;
+      w.appendChild(u);
+    }
+    return { box: w, input: inp };
+  }
+
+  function renderExtras() {
+    var host = $('extras');
+    host.textContent = '';
+    if (!extras.length) {
+      var p = document.createElement('p');
+      p.className = 'empty';
+      p.textContent = 'Nenhum acessório. Toque em um item acima para somar ao custo de cada unidade.';
+      host.appendChild(p);
+      return;
+    }
+    extras.forEach(function (e, i) {
+      var row = document.createElement('div');
+      row.className = 'xrow';
+
+      var nm = mkBox('', '', { 'aria-label': 'Nome do acessório', placeholder: 'Nome do item', autocomplete: 'off' });
+      nm.box.classList.add('xname');
+      nm.input.value = e.n;
+      nm.input.addEventListener('input', function () { extras[i].n = nm.input.value; update(); });
+
+      var q = mkBox('', 'un', { 'aria-label': 'Quantidade por unidade', inputmode: 'decimal' });
+      q.input.value = e.q;
+      q.input.addEventListener('input', function () { extras[i].q = q.input.value; update(); });
+
+      var p = mkBox('R$', '', { 'aria-label': 'Preço de cada item', inputmode: 'decimal' });
+      p.input.value = e.p;
+      p.input.addEventListener('input', function () { extras[i].p = p.input.value; update(); });
+
+      var x = document.createElement('button');
+      x.type = 'button';
+      x.className = 'xbtn';
+      x.setAttribute('aria-label', 'Remover acessório');
+      x.textContent = '×';
+      x.addEventListener('click', function () { extras.splice(i, 1); renderExtras(); update(); });
+
+      row.appendChild(nm.box);
+      row.appendChild(q.box);
+      row.appendChild(p.box);
+      row.appendChild(x);
+      host.appendChild(row);
+    });
+  }
+
+  // ---------- Taxas dos canais ----------
+  function mergeCanais(salvo) {
+    var base = clonar(CANAIS_PADRAO);
+    if (!Array.isArray(salvo)) return base;
+    base.forEach(function (d) {
+      var s = salvo.filter(function (c) { return c && c.id === d.id; })[0];
+      if (!s) return;
+      if (Array.isArray(s.tiers) && s.tiers.length === d.tiers.length) {
+        d.tiers = s.tiers.map(function (t) { return { ate: String(t.ate == null ? '0' : t.ate), pct: String(t.pct == null ? '0' : t.pct), fixa: String(t.fixa == null ? '0' : t.fixa) }; });
+      }
+      if (s.minCom != null) d.minCom = String(s.minCom);
+      if (s.frete != null) d.frete = String(s.frete);
+      if (d.extraCpf != null && s.cpf != null) d.cpf = !!s.cpf;
+    });
+    return base;
+  }
+
+  var tCanais = null, cfgChain = Promise.resolve();
+  function salvarCanais() {
+    lsSet(K_CANAIS, canais);
+    if (!db) return;
+    clearTimeout(tCanais);
+    tCanais = setTimeout(function () {
+      cfgChain = cfgChain.then(function () {
+        return db.doc('config/canais').set({ canais: canais, atualizado: new Date().toISOString() });
+      }).catch(function () { /* sem permissão ou sem rede: o valor segue salvo neste navegador */ });
+    }, 700);
+  }
+  function mudouCanais() { salvarCanais(); update(); renderModelos(); }
+
+  function el(tag, cls, txt) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (txt != null) e.textContent = txt;
+    return e;
+  }
+
+  function renderTaxas() {
+    var host = $('taxas-list');
+    host.textContent = '';
+    canais.forEach(function (ch, ci) {
+      var def = CANAIS_PADRAO[ci];
+      var sec = el('section', 'sec');
+      var head = el('div');
+      head.appendChild(el('h2', '', ch.nome));
+      head.appendChild(el('p', 'note', def.nota));
+      var rb = el('button', 'ghost', 'Restaurar este canal');
+      rb.type = 'button';
+      rb.style.marginTop = '12px';
+      rb.addEventListener('click', function () { canais[ci] = clonar(def); renderTaxas(); mudouCanais(); });
+      head.appendChild(rb);
+      var body = el('div', 'body');
+
+      var th = el('div', 'trow thead');
+      th.appendChild(el('span', '', 'Preço de venda até'));
+      th.appendChild(el('span', '', 'Comissão'));
+      th.appendChild(el('span', '', 'Tarifa fixa'));
+      body.appendChild(th);
+
+      ch.tiers.forEach(function (t, i) {
+        var last = i === ch.tiers.length - 1;
+        var row = el('div', 'trow');
+        if (last) {
+          row.appendChild(el('span', 'tlast', ch.tiers.length > 1 ? 'Acima disso' : 'Qualquer preço'));
+        } else {
+          var a = mkBox('R$', '', { inputmode: 'decimal', 'aria-label': ch.nome + ', faixa ' + (i + 1) + ': preço até' });
+          a.input.value = t.ate;
+          a.input.addEventListener('input', function () { t.ate = a.input.value; mudouCanais(); });
+          row.appendChild(a.box);
+        }
+        var p = mkBox('', '%', { inputmode: 'decimal', 'aria-label': ch.nome + ', faixa ' + (i + 1) + ': comissão em porcentagem' });
+        p.input.value = t.pct;
+        p.input.addEventListener('input', function () { t.pct = p.input.value; mudouCanais(); });
+        var x = mkBox('R$', '', { inputmode: 'decimal', 'aria-label': ch.nome + ', faixa ' + (i + 1) + ': tarifa fixa por item' });
+        x.input.value = t.fixa;
+        x.input.addEventListener('input', function () { t.fixa = x.input.value; mudouCanais(); });
+        row.appendChild(p.box);
+        row.appendChild(x.box);
+        body.appendChild(row);
+      });
+
+      var grid = el('div', 'grid');
+      var fFrete = el('div', 'f');
+      var lf = el('label', '', 'Frete e outros custos por unidade');
+      var idF = 'frete-' + ch.id;
+      lf.setAttribute('for', idF);
+      var bf = mkBox('R$', '', { id: idF, inputmode: 'decimal' });
+      bf.input.value = ch.frete;
+      bf.input.addEventListener('input', function () { ch.frete = bf.input.value; mudouCanais(); });
+      fFrete.appendChild(lf);
+      fFrete.appendChild(bf.box);
+      grid.appendChild(fFrete);
+
+      if (ch.id !== 'direta') {
+        var fMin = el('div', 'f');
+        var lm = el('label', '', 'Comissão mínima por item');
+        var idM = 'min-' + ch.id;
+        lm.setAttribute('for', idM);
+        var bm = mkBox('R$', '', { id: idM, inputmode: 'decimal' });
+        bm.input.value = ch.minCom;
+        bm.input.addEventListener('input', function () { ch.minCom = bm.input.value; mudouCanais(); });
+        fMin.appendChild(lm);
+        fMin.appendChild(bm.box);
+        grid.appendChild(fMin);
+      }
+      body.appendChild(grid);
+
+      if (ch.extraCpf != null) {
+        var lab = el('label', 'check');
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = !!ch.cpf;
+        cb.addEventListener('change', function () { ch.cpf = cb.checked; mudouCanais(); });
+        lab.appendChild(cb);
+        lab.appendChild(document.createTextNode('Sou vendedor pessoa física (CPF): soma R$ ' + String(ch.extraCpf).replace('.', ',') + ',00 por item'));
+        body.appendChild(lab);
+      }
+
+      sec.appendChild(head);
+      sec.appendChild(body);
+      host.appendChild(sec);
+    });
+  }
+
+  $('restaurar-todos').addEventListener('click', function () {
+    canais = clonar(CANAIS_PADRAO);
+    renderTaxas();
+    mudouCanais();
+  });
+
+  // ---------- Canais no painel ----------
+  function buildChs() {
+    var host = $('chs');
+    host.textContent = '';
+    canais.forEach(function (ch) {
+      var b = el('button', 'chrow');
+      b.type = 'button';
+      b.setAttribute('data-id', ch.id);
+      b.setAttribute('aria-pressed', 'false');
+      b.appendChild(el('span', 'n', ch.nome));
+      b.appendChild(el('span', 'pr', ''));
+      b.appendChild(el('span', 'm', ''));
+      b.addEventListener('click', function () { sel = ch.id; update(); });
+      host.appendChild(b);
+    });
+  }
+
+  // ---------- Dica do gráfico ----------
+  var tip = $('tip');
+  function showTip(seg) {
+    tip.textContent = '';
+    tip.appendChild(el('strong', '', seg._v));
+    tip.appendChild(el('span', '', seg._n + ' · ' + seg._p));
+    tip.hidden = false;
+    var wrap = $('out-bar').parentNode.getBoundingClientRect();
+    var r = seg.getBoundingClientRect();
+    var left = r.left - wrap.left + r.width / 2;
+    var half = tip.offsetWidth / 2;
+    left = Math.max(half, Math.min(wrap.width - half, left));
+    tip.style.left = left + 'px';
+    tip.style.top = (r.top - wrap.top - 8) + 'px';
+  }
+  function hideTip() { tip.hidden = true; }
+
+  // ---------- Cálculo e painel ----------
+  function nomeCanalTaxas(id) { return id === 'direta' ? 'Taxa de pagamento' : 'Taxas do canal'; }
+
+  function update() {
+    var f = formValues();
+    var s = toS(f, extras);
+    var r = calc(s, canais);
+    var qtd = Math.max(1, Math.floor(num($('qtd').value)) || 1);
+    var nome = (f.peca || '').trim() || 'Peça sem nome';
+    var ch = canais.filter(function (c) { return c.id === sel; })[0] || canais[0];
+    sel = ch.id;
+    var c = r.res[ch.id];
+
+    $('out-peca').textContent = nome;
+    $('out-preco').textContent = brl.format(c.price);
+    $('dock-preco').textContent = brl.format(c.price);
+    $('dock-nome').textContent = 'Por unidade · ' + ch.nome;
+    $('out-canal').innerHTML = '<b></b>' + (qtd > 1
+      ? ' · pedido de <b>' + qtd + ' un.</b>: <b>' + brl.format(c.price * qtd) + '</b>'
+      : ' · 1 unidade');
+    $('out-canal').firstChild.textContent = ch.nome;
+    $('out-lucro').innerHTML = 'Lucro de <b>' + brl.format(c.lucro) + '</b> por unidade, <b>' +
+      pct0.format(c.margemReal) + '%</b> sobre o custo';
+
+    var falta = !s.peso || r.horas <= 0;
+    $('out-aviso').hidden = !falta;
+    if (falta) $('out-aviso').textContent = 'Informe o peso e o tempo da impressão para incluir filamento, energia e desgaste da máquina.';
+
+    $('rd-mat').innerHTML = 'Filamento: <b>' + brl3.format(r.gramaPreco) + '</b> por grama · <b>' +
+      dec.format(r.gramasComPerda) + ' g</b> com a perda';
+    $('rd-maq').innerHTML = 'Desgaste: <b>' + brl.format(r.depHora) + '</b>/h + manutenção <b>' +
+      brl.format(s.manut) + '</b>/h = <b>' + brl.format(r.maqHora) + '</b> por hora de impressão';
+    $('rd-en').innerHTML = 'Energia: <b>' + brl.format(r.energiaHora) + '</b> por hora de impressão';
+    $('rd-ex').innerHTML = extras.length ? 'Acessórios somam <b>' + brl.format(r.acess) + '</b> por unidade' : '';
+
+    // Lista de canais (também seleciona o canal mostrado)
+    Array.prototype.forEach.call($('chs').children, function (b) {
+      var id = b.getAttribute('data-id');
+      var cr = r.res[id];
+      b.setAttribute('aria-pressed', id === sel ? 'true' : 'false');
+      b.children[1].textContent = brl.format(cr.price);
+      b.children[2].textContent = 'taxas ' + brl.format(cr.taxas) + ' · lucro ' + brl.format(cr.lucro);
+    });
+
+    // Composição do preço no canal escolhido
+    var total = c.price > 0 ? c.price : 1;
+    var grupos = [
+      ['Custo de produção', r.custo, 's-custo'],
+      [nomeCanalTaxas(ch.id), c.taxas, 's-canal'],
+      ['Imposto', c.imposto, 's-imposto'],
+      ['Lucro', c.lucro, 's-lucro']
+    ];
+    var rowG = function (g) {
+      var z = g[1] <= 0.0049 ? ' zero' : '';
+      return '<li class="row g' + z + '"><span class="sw ' + g[2] + '"></span><span>' + g[0] + '</span><span class="v">' +
+        brl.format(g[1]) + '</span><span class="p">' + pct0.format(g[1] / total * 100) + '%</span></li>';
+    };
+    var rowS = function (nomeLinha, v) {
+      return '<li class="row sub"><span></span><span>' + nomeLinha + '</span><span class="v">' + brl.format(v) +
+        '</span><span class="p">' + pct1.format(v / total * 100) + '%</span></li>';
+    };
+    var html = rowG(grupos[0]) +
+      rowS('Filamento', r.mat) + rowS('Energia', r.energia) + rowS('Desgaste da máquina', r.desgaste) +
+      rowS('Reserva para falhas', r.falhas) + rowS('Acessórios', r.acess) + rowS('Mão de obra', r.mo) +
+      rowS('Aplicativos e software', r.app) +
+      rowG(grupos[1]);
+    if (c.com > 0) html += rowS('Comissão (' + pct1.format(c.pct) + '%)', c.com);
+    if (c.fixa > 0) html += rowS('Tarifa fixa por item', c.fixa);
+    if (c.frete > 0) html += rowS('Frete e outros custos', c.frete);
+    html += rowG(grupos[2]) + rowG(grupos[3]) +
+      '<li class="row sum"><span></span><span>Preço de venda</span><span class="v">' + brl.format(c.price) +
+      '</span><span class="p">100%</span></li>';
+    $('out-rows').innerHTML = html;
+
+    var bar = $('out-bar');
+    bar.textContent = '';
+    hideTip();
+    var partes = [];
+    grupos.forEach(function (g) {
+      if (g[1] <= 0) return;
+      var seg = document.createElement('i');
+      seg.className = g[2];
+      seg.style.background = 'var(--' + g[2] + ')';
+      seg.style.flex = (g[1] / total) + ' 1 0%';
+      seg.tabIndex = 0;
+      seg.setAttribute('role', 'img');
+      var txt = g[0] + ': ' + brl.format(g[1]) + ', ' + pct0.format(g[1] / total * 100) + '% do preço';
+      seg.setAttribute('aria-label', txt);
+      seg._v = brl.format(g[1]);
+      seg._n = g[0];
+      seg._p = pct0.format(g[1] / total * 100) + '% do preço';
+      seg.addEventListener('pointerenter', function () { showTip(seg); });
+      seg.addEventListener('pointermove', function () { showTip(seg); });
+      seg.addEventListener('pointerleave', hideTip);
+      seg.addEventListener('focus', function () { showTip(seg); });
+      seg.addEventListener('blur', hideTip);
+      bar.appendChild(seg);
+      partes.push(txt);
+    });
+    bar.setAttribute('aria-label', 'Para onde vai o preço de venda. ' + partes.join('. '));
+
+    lastSummary = [
+      nome,
+      'Custo de produção por unidade: ' + brl.format(r.custo) + ' (aplicativos e software: ' + brl.format(r.app) + ')',
+      qtd > 1 ? 'Pedido de ' + qtd + ' un.' : '',
+      '',
+      'Preço de venda por unidade'
+    ].concat(canais.map(function (cn) {
+      var cr = r.res[cn.id];
+      return cn.nome + ': ' + brl.format(cr.price) + ' (taxas ' + brl.format(cr.taxas) + ', imposto ' + brl.format(cr.imposto) + ', lucro ' + brl.format(cr.lucro) + ')';
+    })).filter(function (l, i) { return l !== '' || i === 3; }).join('\n');
+
+    lsSet(K_RASC, { f: f, x: extras, edit: editing, sel: sel });
+  }
+
+  // ---------- Modelos salvos ----------
+  function dataBR(iso) {
+    try { return new Date(iso).toLocaleDateString('pt-BR'); } catch (e) { return ''; }
+  }
+
+  function renderModelos() {
+    $('cnt').textContent = String(modelos.length);
+    $('store-note').textContent = db
+      ? 'Os modelos ficam salvos na sua conta e aparecem em qualquer aparelho.'
+      : 'Os modelos ficam salvos só neste navegador. Se você limpar os dados do navegador, eles somem.';
+    var host = $('mlist');
+    host.textContent = '';
+    var q = ($('busca').value || '').trim().toLowerCase();
+    var lista = modelos.slice().sort(function (a, b) {
+      return String(b.atualizado || '').localeCompare(String(a.atualizado || ''));
+    }).filter(function (m) { return !q || String(m.nome || '').toLowerCase().indexOf(q) !== -1; });
+
+    if (!lista.length) {
+      host.appendChild(el('p', 'mempty', modelos.length
+        ? 'Nenhum modelo com esse nome.'
+        : 'Nenhum modelo salvo ainda. Preencha a calculadora e toque em Salvar modelo.'));
+      return;
+    }
+    var grid = el('div', 'mgrid');
+    lista.forEach(function (m) {
+      var s = toS(m.f || {}, m.x || []);
+      var r = calc(s, canais);
+      var card = el('article', 'mcard');
+      var top = el('div');
+      top.appendChild(el('h3', '', m.nome || 'Sem nome'));
+      var tempo = (s.hh ? s.hh + ' h ' : '') + (s.mm ? s.mm + ' min' : '');
+      top.appendChild(el('p', 'mmeta', dec.format(s.peso) + ' g · ' + (tempo.trim() || 'sem tempo') +
+        ' · atualizado em ' + dataBR(m.atualizado)));
+      card.appendChild(top);
+
+      var ul = el('ul', 'mprices');
+      var li0 = el('li');
+      li0.appendChild(el('span', '', 'Custo de produção'));
+      li0.appendChild(el('b', '', brl.format(r.custo)));
+      ul.appendChild(li0);
+      canais.forEach(function (cn) {
+        var li = el('li');
+        li.appendChild(el('span', '', cn.nome));
+        li.appendChild(el('b', '', brl.format(r.res[cn.id].price)));
+        ul.appendChild(li);
+      });
+      card.appendChild(ul);
+
+      var act = el('div', 'mactions');
+      var bo = el('button', 'btn', 'Abrir e editar');
+      bo.type = 'button';
+      bo.addEventListener('click', function () { abrir(m); });
+      var bd = el('button', 'ghost', 'Duplicar');
+      bd.type = 'button';
+      bd.addEventListener('click', function () { duplicar(m); });
+      var bx = el('button', 'ghost', 'Excluir');
+      bx.type = 'button';
+      var pend = false, tmr = null;
+      bx.addEventListener('click', function () {
+        if (!pend) {
+          pend = true;
+          bx.textContent = 'Confirmar exclusão';
+          bx.classList.add('danger');
+          tmr = setTimeout(function () { pend = false; bx.textContent = 'Excluir'; bx.classList.remove('danger'); }, 4000);
+          return;
+        }
+        clearTimeout(tmr);
+        excluir(m);
+      });
+      act.appendChild(bo);
+      act.appendChild(bd);
+      act.appendChild(bx);
+      card.appendChild(act);
+      grid.appendChild(card);
+    });
+    host.appendChild(grid);
+  }
+  $('busca').addEventListener('input', renderModelos);
+
+  function abrir(m) {
+    setForm(m.f || {});
+    extras = copiaExtras(m.x);
+    editing = { id: m.id, nome: m.nome || 'Sem nome', criado: m.criado };
+    renderExtras();
+    renderToolbar();
+    update();
+    mostrarAba('calc');
+    try { $('t-calc').scrollIntoView({ block: 'start' }); } catch (e) { /* ignora */ }
+    aviso('Modelo aberto. Altere os valores e toque em Atualizar modelo.');
+  }
+
+  function pacote(novo) {
+    var f = formValues();
+    var nome = (f.peca || '').trim();
+    var agora = new Date().toISOString();
+    var atualizar = !!editing && !novo;
+    return {
+      nome: nome, atualizar: atualizar,
+      dados: { nome: nome, criado: atualizar ? (editing.criado || agora) : agora, atualizado: agora, f: f, x: copiaExtras(extras) }
+    };
+  }
+
+  function gravar(p) {
+    if (db) {
+      if (p.atualizar) {
+        return db.doc('modelos/' + editing.id).set(p.dados).then(function () { return editing.id; });
+      }
+      return db.collection('modelos').add(p.dados).then(function (ref) { return ref.id; });
+    }
+    var lista = lsGet(K_MODELOS) || [];
+    var id;
+    if (p.atualizar) {
+      id = editing.id;
+      var achou = false;
+      lista = lista.map(function (m) {
+        if (m.id !== id) return m;
+        achou = true;
+        return Object.assign({ id: id }, p.dados);
+      });
+      if (!achou) lista.push(Object.assign({ id: id }, p.dados));
+    } else {
+      id = 'l' + Date.now().toString(36);
+      lista.push(Object.assign({ id: id }, p.dados));
+    }
+    lsSet(K_MODELOS, lista);
+    modelos = lista;
+    renderModelos();
+    return Promise.resolve(id);
+  }
+
+  function salvar(novo) {
+    var f = formValues();
+    if (!(f.peca || '').trim()) {
+      aviso('Dê um nome ao modelo antes de salvar.', true);
+      $('peca').focus();
+      return;
+    }
+    var p = pacote(novo);
+    gravar(p).then(function (id) {
+      editing = { id: id, nome: p.nome, criado: p.dados.criado };
+      renderToolbar();
+      update();
+      aviso(p.atualizar ? 'Modelo atualizado.' : 'Modelo salvo. Veja na aba Modelos salvos.');
+    }).catch(function () {
+      aviso('Não foi possível salvar agora. Tente de novo.', true);
+    });
+  }
+
+  function duplicar(m) {
+    var agora = new Date().toISOString();
+    var dados = { nome: (m.nome || 'Sem nome') + ' (cópia)', criado: agora, atualizado: agora, f: Object.assign({}, m.f), x: copiaExtras(m.x) };
+    dados.f.peca = dados.nome;
+    var p = { nome: dados.nome, atualizar: false, dados: dados };
+    gravar(p).then(function () { aviso('Cópia criada.'); }).catch(function () { aviso('Não foi possível duplicar agora.', true); });
+  }
+
+  function excluir(m) {
+    var fim = function () {
+      if (editing && editing.id === m.id) { editing = null; renderToolbar(); update(); }
+      aviso('Modelo excluído.');
+    };
+    if (db) {
+      db.doc('modelos/' + m.id).delete().then(fim).catch(function () { aviso('Não foi possível excluir agora.', true); });
+    } else {
+      var lista = (lsGet(K_MODELOS) || []).filter(function (x) { return x.id !== m.id; });
+      lsSet(K_MODELOS, lista);
+      modelos = lista;
+      renderModelos();
+      fim();
+    }
+  }
+
+  function novoCalculo() {
+    editing = null;
+    ['peca', 'peso', 'hh', 'mm'].forEach(function (id) { $(id).value = ''; });
+    $('pecasImp').value = '1';
+    $('qtd').value = '1';
+    extras = [];
+    renderExtras();
+    renderToolbar();
+    update();
+    $('peca').focus();
+  }
+
+  $('btn-save').addEventListener('click', function () { salvar(false); });
+  $('btn-savenew').addEventListener('click', function () { salvar(true); });
+  $('btn-new').addEventListener('click', novoCalculo);
+
+  // ---------- Eventos gerais ----------
+  fields.forEach(function (el2) {
+    el2.addEventListener('input', update);
+    el2.addEventListener('change', update);
+  });
+
+  $('chips').addEventListener('click', function (ev) {
+    var b = ev.target.closest('.chip');
+    if (!b) return;
+    extras.push({ n: b.getAttribute('data-n'), q: '1', p: b.getAttribute('data-p') });
+    renderExtras();
+    update();
+    var inputs = $('extras').querySelectorAll('.xname input');
+    if (inputs.length && !b.getAttribute('data-n')) inputs[inputs.length - 1].focus();
+  });
+
+  $('copy').addEventListener('click', function () {
+    var btn = $('copy');
+    var box = $('sumbox');
+    var done = function () {
+      box.hidden = true;
+      btn.textContent = 'Resumo copiado';
+      setTimeout(function () { btn.textContent = 'Copiar resumo'; }, 1800);
+    };
+    var fallback = function () {
+      box.value = lastSummary;
+      box.hidden = false;
+      box.focus();
+      box.select();
+      btn.textContent = 'Selecione e copie o texto';
+    };
+    try {
+      navigator.clipboard.writeText(lastSummary).then(done, fallback);
+    } catch (e) { fallback(); }
+  });
+
+  $('dock-go').addEventListener('click', function () {
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    $('result').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+  });
+
+  // ---------- Armazenamento na nuvem (quando disponível) ----------
+  function iniciarNuvem() {
+    db.doc('config/canais').get().then(function (snap) {
+      if (!snap.exists) return;
+      var d = snap.data();
+      if (d && d.canais) {
+        canais = mergeCanais(d.canais);
+        lsSet(K_CANAIS, canais);
+        renderTaxas();
+        buildChs();
+        update();
+        renderModelos();
+      }
+    }).catch(function () { /* mantém os valores deste navegador */ });
+
+    db.collection('modelos').onSnapshot(function (snap) {
+      modelos = snap.docs.map(function (d) {
+        var o = Object.assign({}, d.data());
+        o.id = d.id;
+        return o;
+      });
+      renderModelos();
+    }, function () {
+      db = null;
+      modelos = lsGet(K_MODELOS) || [];
+      renderModelos();
+    });
+  }
+
+  // ---------- Início ----------
+  var rasc = lsGet(K_RASC);
+  if (rasc && rasc.f) {
+    setForm(rasc.f);
+    if (Array.isArray(rasc.x)) extras = copiaExtras(rasc.x);
+    if (rasc.edit && rasc.edit.id) editing = rasc.edit;
+    if (rasc.sel) sel = rasc.sel;
+  }
+  var cs = lsGet(K_CANAIS);
+  if (cs) canais = mergeCanais(cs);
+  modelos = lsGet(K_MODELOS) || [];
+
+  renderExtras();
+  renderTaxas();
+  buildChs();
+  renderToolbar();
+  update();
+  renderModelos();
+
+  try {
+    if (window.claude && window.claude.use) {
+      window.claude.use('db').then(function (d) {
+        if (!d) return;
+        db = d;
+        iniciarNuvem();
+      }).catch(function () { /* segue com o armazenamento do navegador */ });
+    }
+  } catch (e) { /* segue com o armazenamento do navegador */ }
+})();
+</script>
+
+</body>
+</html>
